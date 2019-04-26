@@ -4,109 +4,167 @@ import annotation.example.annotation.Init;
 import annotation.example.annotation.Service;
 import annotation.example.service.LazyService;
 import annotation.example.service.SimpleService;
-import com.sun.istack.internal.NotNull;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.List;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 public class ProcessAnnotation {
 
+    private static Map<String, Object> serviceMap = new HashMap<>();
+
     public static void main(String[] args) {
 
-//        checkService(SimpleService.class);
-//        checkService(LazyService.class);
-//        checkService(String.class);
+        String[] classNames = {
+                "annotation.example.service.LazyService",
+                "annotation.example.service.SimpleService",
+                "java.lang.String"};
 
-//        List<Class<?>> stringTree = new ArrayList<>();
-//        getClassHierarchy(String.class, stringTree);
-//
-//        for (Class clazz: stringTree) {
-//            System.out.println(clazz.getSimpleName());
-//        }
+        for (String className : classNames) {
+             loadService(className);
+        }
+        //System.out.println(serviceMap);
 
+        SimpleService simpleService = (SimpleService) serviceMap.get("simpleServiceAnnotation");
+        System.out.println(simpleService.getS());
+        System.out.println(simpleService.getI());
 
-        inspectService(SimpleService.class);
-        inspectService(LazyService.class);
-        inspectService(String.class);
+//        checkClass(SimpleService.class);
+//        checkClass(LazyService.class);
+//        checkClass(String.class);
+
+//        inspectService(SimpleService.class);
+//        inspectService(LazyService.class);
+//        inspectService(String.class);
     }
 
-    private static void inspectService(Class<?> service) {
-        if (service.isAnnotationPresent(Service.class)){
 
-            final Service classAnnotation = service.getAnnotation(Service.class);
-            if (classAnnotation.lazyLoad()) {
+    private static void loadService(String className) {
 
-            } else {
-
+        Class clazz = null;
+        try {
+            clazz = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        if (Objects.requireNonNull(clazz).isAnnotationPresent(Service.class)) {
+                Service annotation = (Service) clazz.getAnnotation(Service.class);
+            Object service = null; // or through constructor
+            try {
+                service = clazz.newInstance();
+                initMethod(service);
+            } catch (InstantiationException | IllegalAccessException e) {
+                e.printStackTrace();
             }
+//            //trough constructor
+//            Constructor[] constructors = clazz.getConstructors();
+//            for (Constructor c : constructors) {
+//                if (c.getParameters().length == 0) {
+//                    System.out.println("[" + clazz.getSimpleName() + "] has a default constructor");
+//                } else {
+//                    System.out.println("[" + clazz.getSimpleName() + "] has a constructor with parameters: ");
+//                    Arrays.stream(c.getParameters())
+//                            .forEach(p -> System.out.println("\t" + p.getType().getSimpleName()));
+//                }
+//            }
+            serviceMap.put(annotation.name(), service);
+            }
+        System.out.println();
+    }
 
-            Method[] methods = service.getMethods();
-            for (Method method: methods) {
-                if (method.isAnnotationPresent(Init.class)) {
-                    System.out.println("Method [" + method.getName() + "] in [" + service.getSimpleName() + "]");
-                    final Init annotation = method.getAnnotation(Init.class);
-                    System.out.println("\tSuppersException: " +  annotation.suppresException());
-
-
-
-                } else {
-                    //System.out.println(" Method [" + method.getName() + "] in [" + service.getSimpleName() + "]");
+    private static void initMethod(Object object) {
+        Method[] methods = object.getClass().getMethods();
+        for (Method method : methods) {
+            if (method.isAnnotationPresent(Init.class)){
+                try {
+                    method.invoke(object);
+                } catch (IllegalAccessException | InvocationTargetException e) {
+                    Init annotation = method.getAnnotation(Init.class);
+                    if (annotation.suppresException()) {
+                        System.err.println("suppressed:" + e.getCause().getMessage() );
+                    } else {
+                        throw new RuntimeException(e.getMessage());
+                    }
                 }
             }
-
-
-
-
-//
-//            System.out.println("\n" + annotation.getClass().getSimpleName() + " found in service: ["
-//                    + service.getSimpleName() + "]");
-//            System.out.println("\tannotation name = " + annotation.name());
-//            System.out.println("\tannotation lazyLoad = " + annotation.lazyLoad());
-        } else {
-            System.out.println("\nservice: [" + service.getSimpleName() + "] doesn't contains required annotation");
         }
     }
 
-    private static void checkService(Class<?> service) {
-        System.out.println("\nChecking [" + service.getSimpleName() + "] ... ");
-        if (service.isAnnotationPresent(Service.class)) {
-
+    private static void checkClass(Class<?> service) {
+        System.out.println("Checking class: [" + service + "] " +
+                "\n\tname: " + service.getName() +
+                "\n\tcanonical name: " + service.getCanonicalName() +
+                "\n\tsimple name: " + service.getSimpleName());
+        boolean isAnnotation =  service.isAnnotation();
+        System.out.println("\tis annotation: " + isAnnotation);
+        //------------------------------------------------------
+        boolean containsAnnotation = service.isAnnotationPresent(Service.class);
+        System.out.println("\tcontains annotation [@Service]: " + containsAnnotation +"\n");
+        if (containsAnnotation) {
             Service annotation = service.getAnnotation(Service.class);
-            System.out.println(">>>\t" + annotation.getClass().getSimpleName() + " is found!");
 
-            System.out.println(">>>\tservice.getAnnotations():");
-            Annotation[] allAnnotations = service.getAnnotations(); // all annotations including ancestor's declaration
-            for (Annotation ann: allAnnotations) {
-                printAnnotationDetails(annotation, ann);
-            }
+            System.out.println("\t\tannotation [@Service] class name: " + annotation.getClass().getName());
+            System.out.println("\t\tannotation [@Service] class canonical name: " + annotation.getClass().getCanonicalName());
+            System.out.println("\t\tannotation [@Service] class simple name: " + annotation.getClass().getSimpleName() + "\n");
 
-            System.out.println(">>>\tservice.getDeclaredAnnotations():");
-            Annotation[] declaredAnnotations = service.getDeclaredAnnotations(); // 'class' declared annotations
-            for (Annotation ann: declaredAnnotations) {
-                printAnnotationDetails(annotation, ann);
-            }
-        } else {
-            System.out.println("\nservice: [" + service.getSimpleName() + "] doesn't contains required annotation");
-        }
+            System.out.println("\t\tannotation [@Service] type name: " + annotation.annotationType().getName());
+            System.out.println("\t\tannotation [@Service] type canonical name: " + annotation.annotationType().getCanonicalName());
+            System.out.println("\t\tannotation [@Service] type simple name: " + annotation.annotationType().getSimpleName() + "\n");
 
-    }
+            System.out.println("\t\tannotation [@Service] details:");
+            System.out.println("\t\t\tannotation name = " + annotation.name());
+            System.out.println("\t\t\tannotation lazyLoad = " + annotation.lazyLoad() + "\n");
 
-    private static void printAnnotationDetails(Service annotation, Annotation ann) {
-        System.out.println("\t\t" + ann.getClass().getName());
-        System.out.println("\t\t" + ann.getClass().getCanonicalName());
-        System.out.println("\t\t" + ann.getClass().getSimpleName());
-        System.out.println("\t\t\tannotation name = " + annotation.name());
-        System.out.println("\t\t\tannotation lazyLoad = " + annotation.lazyLoad());
-    }
-
-    private static void getClassHierarchy(Class<?> clazz, @NotNull List<Class<?>> result) {
-        result.add(clazz);
-        if (clazz.getSuperclass() != null) {
-            getClassHierarchy(clazz.getSuperclass(), result);
-        } else {
-           Collections.reverse(result);
+//            Field[] fields = annotation.getClass().getFields();
+//            Arrays.stream(fields)
+//                    .forEach(field -> System.out.println("field " + field.getName()));
+//
+//            Field[] declaredFields = annotation.getClass().getDeclaredFields();
+//            Arrays.stream(declaredFields)
+//                    .forEach(field -> System.out.println("field " + field.getName()));
+//            Method[] declaredMethods = annotation.getClass().getDeclaredMethods();
+//            Arrays.stream(declaredMethods)
+//                    .forEach(method -> System.out.println("\t\t\t" + method.getName()));
         }
     }
+
+    //    private static void inspectService(Class<?> service) {
+//        if (service.isAnnotationPresent(Service.class)){
+//
+//            final Service classAnnotation = service.getAnnotation(Service.class);
+//            if (classAnnotation.lazyLoad()) {
+//
+//            } else {
+//
+//            }
+//
+//            Method[] methods = service.getMethods();
+//            for (Method method: methods) {
+//                if (method.isAnnotationPresent(Init.class)) {
+//                    System.out.println("Method [" + method.getName() + "] in [" + service.getSimpleName() + "]");
+//                    final Init annotation = method.getAnnotation(Init.class);
+//                    System.out.println("\tSuppersException: " +  annotation.suppresException());
+//
+//
+//
+//                } else {
+//                    //System.out.println(" Method [" + method.getName() + "] in [" + service.getSimpleName() + "]");
+//                }
+//            }
+//
+////
+////            System.out.println("\n" + annotation.getClass().getSimpleName() + " found in service: ["
+////                    + service.getSimpleName() + "]");
+////            System.out.println("\tannotation name = " + annotation.name());
+////            System.out.println("\tannotation lazyLoad = " + annotation.lazyLoad());
+//        } else {
+//            System.out.println("\nservice: [" + service.getSimpleName() + "] doesn't contains required annotation");
+//        }
+//    }
+
 }
