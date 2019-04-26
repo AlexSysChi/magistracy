@@ -3,7 +3,7 @@ package annotation.example.service;
 import annotation.example.annotation.Init;
 import annotation.example.annotation.Service;
 
-@Service(name = "simpleServiceAnnotation")
+@Service(name = "simpleServiceAnnotation", lazyLoad = false)
 public class SimpleService {
 
     private String s = "default";
@@ -25,7 +25,7 @@ public class SimpleService {
         this.i = i;
     }
 
-    @Init(suppresException = false)
+    @Init(suppersException = true)
     public void initSimpleService() throws RuntimeException{
         System.out.println("init method from SimpleService");
         throw new RuntimeException("SimpleService exception");

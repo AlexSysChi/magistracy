@@ -6,10 +6,10 @@ import annotation.example.annotation.Service;
 @Service(name = "lazyServiceAnnotation", lazyLoad = true)
 public class LazyService {
 
-    @Init(suppresException = true)
+    @Init(suppersException = false)
     public void initLazyService() throws RuntimeException {
         System.out.println("lazyInit method from SimpleService");
-        throw new RuntimeException("****");
+        throw new RuntimeException("LazyService exception");
     }
 
     public void doLazy() {

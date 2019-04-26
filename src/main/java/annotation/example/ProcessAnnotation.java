@@ -2,14 +2,10 @@ package annotation.example;
 
 import annotation.example.annotation.Init;
 import annotation.example.annotation.Service;
-import annotation.example.service.LazyService;
 import annotation.example.service.SimpleService;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -17,6 +13,7 @@ import java.util.Objects;
 public class ProcessAnnotation {
 
     private static Map<String, Object> serviceMap = new HashMap<>();
+    private static Map<String, Boolean> initializesServices = new HashMap<>();
 
     public static void main(String[] args) {
 
@@ -26,13 +23,18 @@ public class ProcessAnnotation {
                 "java.lang.String"};
 
         for (String className : classNames) {
-             loadService(className);
+            loadService(className);
         }
         //System.out.println(serviceMap);
 
-        SimpleService simpleService = (SimpleService) serviceMap.get("simpleServiceAnnotation");
-        System.out.println(simpleService.getS());
-        System.out.println(simpleService.getI());
+        if (serviceMap.size() > 0) {
+            SimpleService simpleService = (SimpleService) serviceMap
+                    .get("simpleServiceAnnotation");
+            //System.out.println(simpleService.getS());
+            //System.out.println(simpleService.getI());
+        }
+
+        System.out.println(initializesServices.size());
 
 //        checkClass(SimpleService.class);
 //        checkClass(LazyService.class);
@@ -52,16 +54,13 @@ public class ProcessAnnotation {
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
+
         if (Objects.requireNonNull(clazz).isAnnotationPresent(Service.class)) {
-                Service annotation = (Service) clazz.getAnnotation(Service.class);
-            Object service = null; // or through constructor
-            try {
-                service = clazz.newInstance();
-                initMethod(service);
-            } catch (InstantiationException | IllegalAccessException e) {
-                e.printStackTrace();
-            }
-//            //trough constructor
+            Service annotation = (Service) clazz.getAnnotation(Service.class);
+            if (!annotation.lazyLoad()) {
+                Object service = null; // or through constructor
+
+                //            //trough constructor
 //            Constructor[] constructors = clazz.getConstructors();
 //            for (Constructor c : constructors) {
 //                if (c.getParameters().length == 0) {
@@ -72,25 +71,35 @@ public class ProcessAnnotation {
 //                            .forEach(p -> System.out.println("\t" + p.getType().getSimpleName()));
 //                }
 //            }
-            serviceMap.put(annotation.name(), service);
+
+                try {
+                    service = clazz.newInstance();
+                    initMethod(service);
+
+                } catch (InstantiationException | IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+                serviceMap.put(annotation.name(), service);
             }
+        }
         System.out.println();
     }
 
     private static void initMethod(Object object) {
         Method[] methods = object.getClass().getMethods();
         for (Method method : methods) {
-            if (method.isAnnotationPresent(Init.class)){
+            if (method.isAnnotationPresent(Init.class)) {
                 try {
                     method.invoke(object);
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     Init annotation = method.getAnnotation(Init.class);
-                    if (annotation.suppresException()) {
-                        System.err.println("suppressed:" + e.getCause().getMessage() );
+                    if (annotation.suppersException()) {
+                        System.err.println("suppressed exception:" + e.getCause().getMessage());
                     } else {
-                        throw new RuntimeException(e.getMessage());
+                        throw new RuntimeException(e.getCause().getMessage(), e);
                     }
                 }
+                initializesServices.put(object.getClass().getAnnotation(Service.class).name(), true);
             }
         }
     }
@@ -100,11 +109,11 @@ public class ProcessAnnotation {
                 "\n\tname: " + service.getName() +
                 "\n\tcanonical name: " + service.getCanonicalName() +
                 "\n\tsimple name: " + service.getSimpleName());
-        boolean isAnnotation =  service.isAnnotation();
+        boolean isAnnotation = service.isAnnotation();
         System.out.println("\tis annotation: " + isAnnotation);
         //------------------------------------------------------
         boolean containsAnnotation = service.isAnnotationPresent(Service.class);
-        System.out.println("\tcontains annotation [@Service]: " + containsAnnotation +"\n");
+        System.out.println("\tcontains annotation [@Service]: " + containsAnnotation + "\n");
         if (containsAnnotation) {
             Service annotation = service.getAnnotation(Service.class);
 
@@ -148,7 +157,7 @@ public class ProcessAnnotation {
 //                if (method.isAnnotationPresent(Init.class)) {
 //                    System.out.println("Method [" + method.getName() + "] in [" + service.getSimpleName() + "]");
 //                    final Init annotation = method.getAnnotation(Init.class);
-//                    System.out.println("\tSuppersException: " +  annotation.suppresException());
+//                    System.out.println("\tSuppersException: " +  annotation.suppersException());
 //
 //
 //
